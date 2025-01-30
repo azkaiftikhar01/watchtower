@@ -1,18 +1,18 @@
-import { Client } from "pg";
-import { config } from "./env";
+import pg from "pg";
+import { config } from "../config/env";
 
-const client = new Client({
+// Create a connection pool
+const pool = new pg.Pool({
   connectionString: config.DATABASE_URL,
 });
 
-export const connectDB = async () => {
-  try {
-    await client.connect();
-    console.log("Connected to PostgreSQL");
-  } catch (error) {
-    console.error("Database connection failed", error);
-    process.exit(1);
+// Test the connection
+pool.query("SELECT NOW()", (err) => {
+  if (err) {
+    console.error("Failed to connect to the database:", err);
+  } else {
+    console.log("Database connected successfully.");
   }
-};
+});
 
-export default client;
+export { pool };

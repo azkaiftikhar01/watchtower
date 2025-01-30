@@ -3,13 +3,15 @@ import { fetchPageSpeedData } from "../services/pagespeed.service";
 import pg from "pg";
 import { config } from "../config/env";
 import CircularJSON from "circular-json";
-
+import NodeCache from "node-cache";
+import { pool } from "../config/db";
+const cache = new NodeCache({ stdTTL: 0 });
 const client = new pg.Client({
   connectionString: config.DATABASE_URL,
 });
 export const fetchAndStoreWebsiteStats = async () => {
     try {
-      await client.connect();
+      const client = await pool.connect(); 
     
       const query = get_websites(); 
       const websites = await client.query(query);
@@ -33,11 +35,9 @@ export const fetchAndStoreWebsiteStats = async () => {
   };
   export const get_states = async (param: Param) => {
     try {
-      await client.connect();
-  
+      const client = await pool.connect(); 
       const query = get_stats_q(param);
       const stats = await client.query(query);
-  
       if (stats.rows.length > 0) {
         
         const parsedStats = stats.rows.map(row => {
@@ -59,4 +59,3 @@ export const fetchAndStoreWebsiteStats = async () => {
       await client.end(); // Make sure to close the client connection
     }
   };
-  

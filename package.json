@@ -24,6 +24,8 @@
     "elysia": "^1.2.10",
     "flatted": "^3.3.2",
     "googleapis": "^140.0.0",
+    "node-cache": "^5.1.2",
+    "node-cron": "^3.0.3",
     "pg": "^8.13.1",
     "yargs": "^17.7.2"
   }

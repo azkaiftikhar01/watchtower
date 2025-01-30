@@ -8,12 +8,12 @@ const store_website_stats = (websiteId: number,  stats: object) => `
     url?: string;
   }
   
-  const get_stats_q = (param: Param) => `
+  const get_stats_q = (url:string) => `
     SELECT ws.website_id, w.url,ws.stats
-    FROM ${process.env.schema}.website_stats ws
-    JOIN ${process.env.schema}.websites w
+    FROM website_stats ws
+    JOIN websites w
     ON ws.website_id = w.id
-    ${param.url && param.url !== "" ? `WHERE w.url = '${param.url}'` : ""}
+    --${url && url !== "" ? `WHERE w.url = '${url}'` : ""}
   `;
 
 export {get_websites,store_website_stats,get_stats_q};
