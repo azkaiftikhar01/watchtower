@@ -1,4 +1,4 @@
-import { get_websites, store_website_stats } from "../database/website.query";
+import { get_stats_q, get_websites, store_website_stats } from "../database/website.query";
 import { fetchPageSpeedData } from "../services/pagespeed.service";
 import pg from "pg";
 import { config } from "../config/env";
@@ -13,8 +13,6 @@ export const fetchAndStoreWebsiteStats = async () => {
     
       const query = get_websites(); 
       const websites = await client.query(query);
-  
-      // Process all websites in parallel using Promise.allSettled
       await Promise.allSettled(
         websites.rows.map(async (website) => {
           try {
@@ -31,6 +29,34 @@ export const fetchAndStoreWebsiteStats = async () => {
       return true;
     } catch (error) {
       console.error("Error fetching and storing stats:", error);
+    }
+  };
+  export const get_states = async (param: Param) => {
+    try {
+      await client.connect();
+  
+      const query = get_stats_q(param);
+      const stats = await client.query(query);
+  
+      if (stats.rows.length > 0) {
+        
+        const parsedStats = stats.rows.map(row => {
+          return {
+            ...row,
+            stats: row.stats ? JSON.parse(row.stats) : null 
+          };
+        });
+
+        return parsedStats;
+      } else {
+        console.log("No data found");
+        return [];
+      }
+    } catch (error) {
+      console.error("Error fetching and storing stats:", error);
+      return { message: "Error fetching stats", error: error.message };
+    } finally {
+      await client.end(); // Make sure to close the client connection
     }
   };
   
