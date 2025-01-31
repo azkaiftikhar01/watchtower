@@ -1,5 +1,5 @@
 import { get_stats_q, get_websites, store_website_stats } from "../database/website.query";
-import { fetchPageSpeedData } from "../services/pagespeed.service";
+import { fetchPageSpeedData, searchAndStoreGovPkWebsites  } from "../services/pagespeed.service";
 import pg from "pg";
 import { config } from "../config/env";
 import CircularJSON from "circular-json";
@@ -12,15 +12,15 @@ const client = new pg.Client({
 export const fetchAndStoreWebsiteStats = async () => {
     try {
       const client = await pool.connect(); 
-    
+      const pksites= await searchAndStoreGovPkWebsites();
       const query = get_websites(); 
       const websites = await client.query(query);
       await Promise.allSettled(
         websites.rows.map(async (website) => {
           try {
             const stats = await fetchPageSpeedData(website.url);
-            const safeStats = CircularJSON.stringify(stats);
-            await client.query(store_website_stats(website.id, safeStats));
+            //const safeStats = CircularJSON.stringify(stats);
+            await client.query(store_website_stats(website.id, stats));
             console.log(`Successfully stored stats for: ${website.url}`);
           } catch (innerError) {
             console.error(`Failed to process ${website.url}:`, innerError);
