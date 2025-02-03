@@ -10,16 +10,20 @@ const client = new pg.Client({
   connectionString: config.DATABASE_URL,
 });
 export const fetchAndStoreWebsiteStats = async () => {
-    try {
-      const client = await pool.connect(); 
-      const pksites= await searchAndStoreGovPkWebsites();
-      const query = get_websites(); 
-      const websites = await client.query(query);
+  try {
+    const client = await pool.connect();
+    const pksites = await searchAndStoreGovPkWebsites();
+    const query = get_websites();
+    const websites = await client.query(query);
+
+    const batchSize = 5; // Limit concurrent requests
+    const websiteBatches = chunkArray(websites.rows, batchSize);
+
+    for (const batch of websiteBatches) {
       await Promise.allSettled(
-        websites.rows.map(async (website) => {
+        batch.map(async (website) => {
           try {
             const stats = await fetchPageSpeedData(website.url);
-            //const safeStats = CircularJSON.stringify(stats);
             await client.query(store_website_stats(website.id, stats));
             console.log(`Successfully stored stats for: ${website.url}`);
           } catch (innerError) {
@@ -27,12 +31,23 @@ export const fetchAndStoreWebsiteStats = async () => {
           }
         })
       );
-  
-      return true;
-    } catch (error) {
-      console.error("Error fetching and storing stats:", error);
+      console.log("Batch processed. Waiting before next batch...");
+      await new Promise((resolve) => setTimeout(resolve, 5000)); // Add a delay between batches
     }
-  };
+
+    return true;
+  } catch (error) {
+    console.error("Error fetching and storing stats:", error);
+  }
+};
+
+// Helper function to split websites into batches
+function chunkArray(array, size) {
+  return Array.from({ length: Math.ceil(array.length / size) }, (_, i) =>
+    array.slice(i * size, i * size + size)
+  );
+}
+
   export const get_states = async (param: Param) => {
     try {
       const client = await pool.connect(); 
@@ -43,7 +58,7 @@ export const fetchAndStoreWebsiteStats = async () => {
         const parsedStats = stats.rows.map(row => {
           return {
             ...row,
-            stats: row.stats ? JSON.parse(row.stats) : null 
+            stats: row.stats
           };
         });
 

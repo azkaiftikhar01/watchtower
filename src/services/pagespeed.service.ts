@@ -1,45 +1,51 @@
 import axios from "axios";
 import { config } from "../config/env";
-export const fetchPageSpeedData = async (url: string) => {
+import { pool } from "../config/db";
+import pg from "pg";
+import { store_websites } from "../database/website.query";
+export const fetchPageSpeedData = async (url: string, retries = 3, delay = 2000): Promise<any> => {
   try {
     const response = await axios.get(
-      `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${url}&key=${config.PAGESPEED_API_KEY}`
+      `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${url}&key=${config.PAGESPEED_API_KEY}`,
+      { timeout: 15000 } // Increase timeout to 15 seconds
     );
 
     const json = response.data;
-   // console.log("API Response:", JSON.stringify(json, null, 2)); // Log the entire response
-
-    // Check if the required fields exist
     if (!json.lighthouseResult || !json.lighthouseResult.categories) {
       throw new Error("Invalid API response structure");
     }
-    //console.log(json.lighthouseResult.categories)
-    const performanceScore = json.lighthouseResult.categories.performance?.score ;
-    const largest_contentful_paint = json.originLoadingExperience.metrics["LARGEST_CONTENTFUL_PAINT_MS"].percentile/1000 ; 
-    const interaction_to_next_paint=json.originLoadingExperience.metrics["INTERACTION_TO_NEXT_PAINT"].percentile/1000;
-    const cumulative_shift_layout = json.lighthouseResult.audits["cumulative-layout-shift"].score/1000 ;
-    const first_contentful_paint = json.originLoadingExperience.metrics["LARGEST_CONTENTFUL_PAINT_MS"].percentile/1000 ;
-    const time_to_first_bite=json.originLoadingExperience.metrics["EXPERIMENTAL_TIME_TO_FIRST_BYTE"].percentile/1000;
-    const speed_index = json.lighthouseResult.audits["speed-index"].displayValue ;
-    const total_blocking_time = json.lighthouseResult.audits["total-blocking-time"].numericValue/1000 ;
-    const cleanedResponse = {
+
+    return {
       url: json.id,
       fetchTime: json.lighthouseResult.fetchTime,
-      performanceScore,
-      largest_contentful_paint,
-      interaction_to_next_paint,
-      cumulative_shift_layout,
-      first_contentful_paint,
-      time_to_first_bite,
-      speed_index
-      //total_blocking_time
+      performanceScore: json.lighthouseResult.categories.performance?.score || 0,
+      largest_contentful_paint:
+        json.originLoadingExperience?.metrics?.["LARGEST_CONTENTFUL_PAINT_MS"]?.percentile / 1000 || 0,
+      interaction_to_next_paint:
+        json.originLoadingExperience?.metrics?.["INTERACTION_TO_NEXT_PAINT"]?.percentile / 1000 || 0,
+      cumulative_shift_layout:
+        json.lighthouseResult?.audits?.["cumulative-layout-shift"]?.score || 0,
+      first_contentful_paint:
+        json.originLoadingExperience?.metrics?.["FIRST_CONTENTFUL_PAINT_MS"]?.percentile / 1000 || 0,
+      time_to_first_bite:
+        json.originLoadingExperience?.metrics?.["EXPERIMENTAL_TIME_TO_FIRST_BYTE"]?.percentile / 1000 || 0,
+      speed_index: json.lighthouseResult?.audits?.["speed-index"]?.numericValue / 1000 || 0,
+      total_blocking_time:
+        json.lighthouseResult?.audits?.["total-blocking-time"]?.numericValue / 1000 || 0,
     };
-    return cleanedResponse;
   } catch (error) {
-    console.error("Error fetching PageSpeed data:", error);
-    throw new Error("Failed to fetch website statistics");
+    console.error(`Error fetching PageSpeed data for ${url}:`, error.message);
+
+    if (retries > 0) {
+      console.log(`Retrying ${url} in ${delay / 1000} seconds...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return fetchPageSpeedData(url, retries - 1, delay * 2); // Exponential backoff
+    }
+
+    throw new Error(`Failed to fetch website statistics after multiple attempts: ${url}`);
   }
 };
+
 import fetch from "node-fetch";
 
 const API_KEY = process.env.SEARCH_API_KEY; 
@@ -47,10 +53,6 @@ const CX = process.env.CX;
 const query = "site:.gov.pk"; 
 const MAX_PAGES = 40; 
 const RESULTS_PER_PAGE = 10;
-import { pool } from "../config/db";
-import pg from "pg";
-import { store_websites } from "../database/website.query";
-
 const client = new pg.Client({
   connectionString: config.DATABASE_URL,
 });
